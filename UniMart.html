@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UniMart – UNIBEN's P2P Marketplace</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    body { background: linear-gradient(135deg,#d1fae5,#e5e7eb); min-height:100vh; display:flex; justify-content:center; font-family: system-ui,-apple-system,'Segoe UI',sans-serif; }
+    #root { width:100%; display:flex; justify-content:center; align-items:flex-start; }
+    ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:#1a6b3c40;border-radius:4px}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+    @keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(26,107,60,.4)}70%{box-shadow:0 0 0 10px rgba(26,107,60,0)}100%{box-shadow:0 0 0 0 rgba(26,107,60,0)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .fade-in{animation:fadeIn .3s ease forwards}
+    .slide-up{animation:slideUp .35s ease forwards}
+    .pulse-ring{animation:pulseRing 2s infinite}
+    .spin{animation:spin .8s linear infinite}
+    input,select,textarea,button{font-family:inherit}
+    input:focus,select:focus,textarea:focus{border-color:#1a6b3c!important;outline:none}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const G = "#1a6b3c";
+const BG = "#f0faf4";
+
+const PRODUCTS = [
+  { id:1,  emoji:"📚", title:"CHM 101 Textbook",        price:2500,  seller:"Adaeze N.",   distance:"~150m away", category:"Textbooks",     rating:4.8, condition:"Good",      description:"Chemistry 101 textbook, one semester use. All pages intact. Perfect for 100-level students." },
+  { id:2,  emoji:"💡", title:"Reading Lamp",             price:3800,  seller:"Tunde B.",    distance:"~200m away", category:"Hostel Gear",   rating:4.5, condition:"Excellent", description:"USB-powered LED lamp. Adjustable neck, 3 brightness levels. Selling because I'm graduating." },
+  { id:3,  emoji:"🍛", title:"Jollof Rice (plate)",      price:700,   seller:"Mama Ngozi",  distance:"~80m away",  category:"Food & Snacks", rating:4.9, condition:"Fresh",     description:"Party jollof with fried chicken and plantain. Made fresh daily. Order before 2pm." },
+  { id:4,  emoji:"👕", title:"UNIBEN Hoodie",            price:8500,  seller:"Emeka O.",    distance:"~300m away", category:"Fashion",       rating:4.6, condition:"New",       description:"Official UNIBEN hoodie, navy blue, size L. Bought two by mistake. Tags still on." },
+  { id:5,  emoji:"🛏️", title:"Mattress Topper",          price:6000,  seller:"Chioma A.",   distance:"~120m away", category:"Hostel Gear",   rating:4.3, condition:"Good",      description:"4-inch foam topper. Makes hostel mattress actually comfortable. Moving off-campus." },
+  { id:6,  emoji:"🔌", title:"Data Cable (Type-C)",      price:1200,  seller:"Bello I.",    distance:"~250m away", category:"Electronics",   rating:4.7, condition:"New",       description:"1.5m braided Type-C, fast charging compatible. Bought extras from a bulk order." },
+  { id:7,  emoji:"📖", title:"Biochem Practical Manual", price:1500,  seller:"Ngozi E.",    distance:"~180m away", category:"Textbooks",     rating:4.4, condition:"Good",      description:"BCH 305 Manual with all experiments. Minor pencil annotations, easily erasable." },
+  { id:8,  emoji:"🩴", title:"Flip Flops (Size 42)",     price:900,   seller:"Kunle A.",    distance:"~90m away",  category:"Fashion",       rating:4.2, condition:"Good",      description:"Quality rubber flip flops, barely worn. Size 42. Great for hostel bathroom runs." },
+];
+const CATEGORIES = ["All","Textbooks","Hostel Gear","Food & Snacks","Fashion","Electronics"];
+const DEMO_CHATS = {
+  1:[{from:"buyer",text:"Hi! Is the CHM 101 textbook still available?",time:"10:02 AM"},{from:"seller",text:"Yes! Just used one semester. All pages intact 📚",time:"10:04 AM"},{from:"buyer",text:"Any torn pages or writing inside?",time:"10:06 AM"},{from:"seller",text:"No torn pages. Just a little highlighter on chapter 3 only.",time:"10:08 AM"},{from:"buyer",text:"Can we meet today? I'm near Ekosodin.",time:"10:10 AM"}],
+  2:[{from:"buyer",text:"Hello, is the lamp USB powered?",time:"9:15 AM"},{from:"seller",text:"Yes! USB-C. Works on powerbank too 💡",time:"9:17 AM"},{from:"buyer",text:"How long is the neck?",time:"9:20 AM"},{from:"seller",text:"About 40cm, fully flexible. Great for night reading.",time:"9:22 AM"},{from:"buyer",text:"Perfect! Let's meet at the Main Gate safe zone.",time:"9:25 AM"}],
+};
+const DEFAULT_CHAT = [{from:"buyer",text:"Hi! Is this item still available?",time:"11:00 AM"},{from:"seller",text:"Yes, still available! Come and get it 😊",time:"11:02 AM"},{from:"buyer",text:"What condition is it in?",time:"11:04 AM"},{from:"seller",text:"Almost as good as new. You'll be satisfied!",time:"11:06 AM"},{from:"buyer",text:"Can we meet at the Main Gate safe zone?",time:"11:08 AM"}];
+const PAY_METHODS = [
+  {id:"card",    label:"Debit/Credit Card",  icon:"💳", desc:"Visa, Mastercard, Verve · Paystack"},
+  {id:"transfer",label:"Bank Transfer",      icon:"🏦", desc:"GTBank, Access, Zenith & more"},
+  {id:"ussd",    label:"USSD",               icon:"📱", desc:"Dial code from any phone"},
+  {id:"qr",      label:"QR Code",            icon:"◼️", desc:"Scan with any banking app"},
+  {id:"wallet",  label:"UniMart Wallet",     icon:"👛", desc:"Balance: ₦15,400"},
+  {id:"crypto",  label:"Crypto (USDT)",      icon:"₿",  desc:"TRC-20 Network"},
+];
+
+// ── Utility ──────────────────────────────────────────────────────────────
+function Toast({message,onClose}){
+  useEffect(()=>{const t=setTimeout(onClose,3000);return()=>clearTimeout(t)},[onClose]);
+  return(
+    <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:9999}} className="slide-up">
+      <div style={{background:G,color:"#fff",padding:"12px 20px",borderRadius:16,boxShadow:"0 8px 32px rgba(26,107,60,.4)",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap"}}>
+        ✓ {message}
+      </div>
+    </div>
+  );
+}
+function Stars({r}){
+  return <span style={{display:"flex",alignItems:"center",gap:2}}>
+    {[1,2,3,4,5].map(i=><span key={i} style={{fontSize:11,color:i<=Math.floor(r)?"#facc15":"#d1d5db"}}>★</span>)}
+    <span style={{fontSize:11,color:"#6b7280",marginLeft:2}}>{r}</span>
+  </span>;
+}
+function Back({onBack}){
+  return <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",color:G,fontWeight:700,fontSize:22,lineHeight:1,padding:"0 4px"}}>‹</button>;
+}
+function EscrowBadge(){
+  return <span style={{display:"inline-flex",alignItems:"center",gap:6,background:BG,border:"1px solid #bbf7d0",borderRadius:10,padding:"6px 12px",fontSize:12,color:G,fontWeight:700}}>🛡️ Protected by UniMart Escrow</span>;
+}
+function VBadge(){
+  return <span style={{display:"inline-flex",alignItems:"center",gap:4,background:BG,border:"1px solid "+G,borderRadius:999,padding:"2px 8px",fontSize:10,color:G,fontWeight:800}}>✓ Verified</span>;
+}
+function QR({size=120}){
+  const rows=9,cells=[];
+  for(let r=0;r<rows;r++) for(let c=0;c<rows;c++){
+    const corner=(r<3&&c<3)||(r<3&&c>=6)||(r>=6&&c<3);
+    const dark=corner||((r+c*3+r*c)%3===0||(r*2+c)%5===1);
+    cells.push(<div key={r+"-"+c} style={{width:size/rows,height:size/rows,background:dark?"#111":"#fff"}}/>);
+  }
+  return <div style={{border:"4px solid #111",borderRadius:8,display:"inline-flex",flexWrap:"wrap",width:size+8,height:size+8}}>{cells}</div>;
+}
+function Countdown({seconds:init}){
+  const [s,setS]=useState(init);
+  useEffect(()=>{if(s<=0)return;const t=setTimeout(()=>setS(x=>x-1),1000);return()=>clearTimeout(t)},[s]);
+  return <span style={{fontFamily:"monospace",fontWeight:800,color:G,fontSize:20}}>{String(Math.floor(s/60)).padStart(2,"0")}:{String(s%60).padStart(2,"0")}</span>;
+}
+
+// ── Splash ────────────────────────────────────────────────────────────────
+function Splash({go}){
+  return <div className="fade-in" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",height:"100%",background:G,padding:"48px 32px 40px"}}>
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center"}}>
+      <div className="pulse-ring" style={{width:96,height:96,background:"#fff",borderRadius:28,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:24,boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+        <span style={{fontSize:48}}>🛒</span>
+      </div>
+      <h1 style={{color:"#fff",fontSize:52,fontWeight:900,letterSpacing:-2,margin:"0 0 8px"}}>UniMart</h1>
+      <p style={{color:"#bbf7d0",fontSize:18,fontWeight:600,margin:"0 0 4px"}}>Buy. Sell. Stay Safe.</p>
+      <p style={{color:"#86efac",fontSize:13,margin:"0 0 28px"}}>UNIBEN's own marketplace</p>
+      <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:8}}>
+        {["🎓 For UNIBEN Students","📍 Ugbowo Only","🛡️ Escrow Safe"].map(t=>
+          <span key={t} style={{background:"rgba(255,255,255,.15)",color:"#bbf7d0",borderRadius:999,padding:"6px 14px",fontSize:12,fontWeight:600}}>{t}</span>
+        )}
+      </div>
+    </div>
+    <div style={{width:"100%",display:"flex",flexDirection:"column",gap:12}}>
+      <button onClick={()=>go("login")} style={{width:"100%",background:"#fff",color:G,border:"none",borderRadius:20,padding:"16px 0",fontWeight:800,fontSize:16,cursor:"pointer",boxShadow:"0 8px 30px rgba(0,0,0,.15)"}}>
+        Get Started 🚀
+      </button>
+      <p style={{color:"#86efac",fontSize:12,textAlign:"center"}}>Exclusively for UNIBEN students in Ugbowo</p>
+    </div>
+  </div>;
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────
+function Login({go,toast}){
+  const [tab,setTab]=useState("login");
+  const [email,setEmail]=useState("");
+  const [verified,setVerified]=useState(false);
+  const [forgot,setForgot]=useState(false);
+  const [fe,setFe]=useState("");
+  const inp={width:"100%",border:"2px solid #e5e7eb",borderRadius:14,padding:"12px 16px",fontSize:14,background:"#fff"};
+
+  if(forgot) return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 24px"}}>
+        <button onClick={()=>setForgot(false)} style={{background:"none",border:"none",color:"#86efac",fontSize:14,cursor:"pointer",marginBottom:14}}>← Back</button>
+        <h2 style={{color:"#fff",fontSize:22,fontWeight:800,margin:0}}>Reset Password</h2>
+        <p style={{color:"#bbf7d0",fontSize:13,margin:"4px 0 0"}}>We'll send a reset link to your UNIBEN email</p>
+      </div>
+      <div style={{padding:"28px 24px",display:"flex",flexDirection:"column",gap:16}}>
+        <div>
+          <label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Student Email</label>
+          <input style={{...inp,marginTop:8}} placeholder="yourname@uniben.edu.ng" value={fe} onChange={e=>setFe(e.target.value)}/>
+        </div>
+        <button onClick={()=>{toast("Reset link sent! Check your email");setForgot(false);}} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:800,fontSize:14,cursor:"pointer"}}>
+          Send Reset Link
+        </button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 24px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+          <div style={{width:40,height:40,background:"#fff",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:20}}>🛒</span></div>
+          <div><div style={{color:"#fff",fontSize:20,fontWeight:900}}>UniMart</div><div style={{color:"#86efac",fontSize:11}}>UNIBEN's Marketplace</div></div>
+        </div>
+        <div style={{display:"flex",background:"rgba(255,255,255,.2)",borderRadius:14,padding:4}}>
+          {["login","register"].map(t=>(
+            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",fontWeight:700,fontSize:13,cursor:"pointer",background:tab===t?"#fff":"transparent",color:tab===t?G:"#fff",transition:"all .2s"}}>
+              {t==="login"?"Log In":"Create Account"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"24px",display:"flex",flexDirection:"column",gap:14}}>
+        {tab==="register"&&<div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Full Name</label><input style={{...inp,marginTop:8}} placeholder="Chukwuemeka Obi"/></div>}
+        <div>
+          <label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Student Email</label>
+          <input style={{...inp,marginTop:8}} placeholder="yourname@uniben.edu.ng" value={email} onChange={e=>setEmail(e.target.value)}/>
+        </div>
+        <div>
+          <label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Password</label>
+          <input type="password" style={{...inp,marginTop:8}} placeholder="••••••••"/>
+        </div>
+        {tab==="register"&&<div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Confirm Password</label><input type="password" style={{...inp,marginTop:8}} placeholder="••••••••"/></div>}
+        {verified
+          ? <div style={{display:"flex",alignItems:"center",gap:8,background:"#f0fdf4",border:"1px solid #86efac",borderRadius:14,padding:"12px 16px"}}><span style={{color:"#16a34a",fontWeight:800}}>✓</span><span style={{color:"#15803d",fontSize:14,fontWeight:700}}>Student identity verified</span></div>
+          : <button onClick={()=>{if(email.includes("@")){setVerified(true);toast("Student verified ✓")}else toast("Enter a valid email first");}} style={{width:"100%",background:"#fff",border:"2px solid "+G,color:G,borderRadius:20,padding:"14px 0",fontWeight:800,fontSize:13,cursor:"pointer"}}>🎓 Verify with Student ID</button>
+        }
+        <button onClick={()=>go("home")} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"16px 0",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(26,107,60,.3)"}}>
+          {tab==="login"?"Continue →":"Create Account →"}
+        </button>
+        <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{flex:1,height:1,background:"#e5e7eb"}}/><span style={{fontSize:12,color:"#9ca3af",fontWeight:600}}>OR</span><div style={{flex:1,height:1,background:"#e5e7eb"}}/></div>
+        <button onClick={()=>{toast("Redirecting to Google...");setTimeout(()=>go("home"),900);}} style={{width:"100%",background:"#fff",border:"2px solid #e5e7eb",color:"#374151",borderRadius:20,padding:"14px 0",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+          <span style={{fontSize:18}}>🌐</span> Continue with Google
+        </button>
+        {tab==="login"&&<button onClick={()=>setForgot(true)} style={{background:"none",border:"none",color:G,fontWeight:700,fontSize:13,cursor:"pointer",padding:"8px 0"}}>Forgot Password?</button>}
+        <div style={{height:16}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── Home Feed ─────────────────────────────────────────────────────────────
+function Home({go,toast}){
+  const [search,setSearch]=useState("");
+  const [cat,setCat]=useState("All");
+  const filtered=PRODUCTS.filter(p=>(cat==="All"||p.category===cat)&&p.title.toLowerCase().includes(search.toLowerCase()));
+  return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 16px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div><p style={{color:"#86efac",fontSize:11,margin:0}}>📍 Ugbowo, Benin City</p><h2 style={{color:"#fff",fontSize:22,fontWeight:900,margin:0}}>UniMart 🛒</h2></div>
+          <div style={{display:"flex",gap:8}}>
+            <button style={{width:36,height:36,background:"rgba(255,255,255,.2)",borderRadius:"50%",border:"none",color:"#fff",fontSize:16,cursor:"pointer"}}>🔔</button>
+            <button onClick={()=>go("profile")} style={{width:36,height:36,background:"#fff",borderRadius:"50%",border:"none",color:G,fontWeight:900,fontSize:12,cursor:"pointer"}}>CO</button>
+          </div>
+        </div>
+        <div style={{position:"relative"}}>
+          <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:"#9ca3af"}}>🔍</span>
+          <input style={{width:"100%",background:"#fff",borderRadius:16,paddingLeft:40,paddingRight:16,paddingTop:12,paddingBottom:12,fontSize:13,border:"none",outline:"none",boxSizing:"border-box"}} placeholder="Search items near you..." value={search} onChange={e=>setSearch(e.target.value)}/>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,padding:"10px 16px",overflowX:"auto",background:"#fff",borderBottom:"1px solid #f3f4f6"}}>
+        {CATEGORIES.map(c=><button key={c} onClick={()=>setCat(c)} style={{flexShrink:0,padding:"6px 14px",borderRadius:999,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",background:cat===c?G:"#f3f4f6",color:cat===c?"#fff":"#6b7280"}}>{c}</button>)}
+      </div>
+      <div style={{margin:"12px 16px 0",background:"linear-gradient(135deg,#1a6b3c,#22863a)",borderRadius:20,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div><p style={{color:"#fff",fontWeight:800,fontSize:13,margin:0}}>🛡️ Safe Trading Zone</p><p style={{color:"#86efac",fontSize:11,margin:"2px 0 0"}}>All payments protected by escrow</p></div>
+        <span style={{fontSize:28}}>✅</span>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"12px 16px"}}>
+        <p style={{fontSize:11,fontWeight:700,color:"#9ca3af",marginBottom:10}}>{filtered.length} items near you</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          {filtered.map(p=>(
+            <div key={p.id} onClick={()=>go("product",p)} style={{background:"#fff",borderRadius:20,padding:12,border:"1px solid #f3f4f6",boxShadow:"0 1px 4px rgba(0,0,0,.06)",cursor:"pointer"}}>
+              <div style={{width:"100%",height:88,background:BG,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><span style={{fontSize:36}}>{p.emoji}</span></div>
+              <p style={{fontSize:12,fontWeight:700,color:"#1f2937",margin:"0 0 4px",lineHeight:1.3}}>{p.title}</p>
+              <p style={{color:G,fontWeight:900,fontSize:14,margin:"0 0 4px"}}>₦{p.price.toLocaleString()}</p>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <p style={{color:"#9ca3af",fontSize:10,margin:0}}>{p.distance}</p>
+                <VBadge/>
+              </div>
+              <button onClick={e=>{e.stopPropagation();go("product",p);}} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:12,padding:"7px 0",fontSize:12,fontWeight:700,cursor:"pointer"}}>Buy</button>
+            </div>
+          ))}
+        </div>
+        <div style={{height:24}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── Product Detail ────────────────────────────────────────────────────────
+function Product({p,go}){
+  if(!p)return null;
+  return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 16px",display:"flex",alignItems:"center",gap:12}}>
+        <Back onBack={()=>go("home")}/>
+        <h2 style={{color:"#fff",fontWeight:700,fontSize:14,flex:1,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</h2>
+        <button style={{background:"none",border:"none",color:"#fff",fontSize:20,cursor:"pointer"}}>♡</button>
+      </div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <div style={{background:"#fff",margin:"16px",borderRadius:24,padding:"28px 0 20px",display:"flex",flexDirection:"column",alignItems:"center",border:"1px solid #f3f4f6"}}>
+          <span style={{fontSize:88}}>{p.emoji}</span>
+          <span style={{background:"#f0fdf4",color:"#16a34a",fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:999,marginTop:8}}>{p.condition}</span>
+        </div>
+        <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{background:"#fff",borderRadius:20,padding:16,border:"1px solid #f3f4f6"}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+              <div>
+                <h3 style={{fontWeight:900,color:"#111827",fontSize:18,margin:"0 0 4px"}}>{p.title}</h3>
+                <p style={{color:G,fontWeight:900,fontSize:24,margin:0}}>₦{p.price.toLocaleString()}</p>
+              </div>
+              <VBadge/>
+            </div>
+            <p style={{color:"#6b7280",fontSize:13,margin:"12px 0 0",lineHeight:1.6}}>{p.description}</p>
+          </div>
+          <div style={{background:"#fff",borderRadius:20,padding:16,border:"1px solid #f3f4f6"}}>
+            <p style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1,margin:"0 0 12px"}}>Seller</p>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:48,height:48,background:G,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:14,flexShrink:0}}>
+                {p.seller.split(" ").map(w=>w[0]).join("").slice(0,2)}
+              </div>
+              <div><p style={{fontWeight:700,color:"#1f2937",margin:"0 0 4px",fontSize:15}}>{p.seller}</p><Stars r={p.rating}/><div style={{marginTop:4}}><VBadge/></div></div>
+            </div>
+          </div>
+          <div style={{background:"#f0fdf4",border:"2px solid #bbf7d0",borderRadius:20,padding:16,display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:24}}>📍</span>
+            <div><p style={{fontWeight:700,color:G,fontSize:14,margin:"0 0 2px"}}>Safe Zone Meeting Spot</p><p style={{color:"#15803d",fontSize:12,margin:0}}>Main Gate · Security Camera Area</p></div>
+          </div>
+          <EscrowBadge/>
+          <div style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:24}}>
+            <button onClick={()=>go("chat",p)} style={{width:"100%",border:"2px solid "+G,background:"#fff",color:G,borderRadius:20,padding:"15px 0",fontWeight:700,fontSize:14,cursor:"pointer"}}>💬 Chat with Seller</button>
+            <button onClick={()=>go("payment",p)} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:700,fontSize:14,cursor:"pointer",boxShadow:"0 4px 20px rgba(26,107,60,.3)"}}>🔒 Pay to Escrow – ₦{p.price.toLocaleString()}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────
+function Chat({p,go,toast}){
+  const [msgs,setMsgs]=useState(DEMO_CHATS[p?.id]||DEFAULT_CHAT);
+  const [input,setInput]=useState("");
+  const [offerOpen,setOfferOpen]=useState(false);
+  const [offerVal,setOfferVal]=useState("");
+  const bottom=useRef(null);
+  useEffect(()=>bottom.current?.scrollIntoView({behavior:"smooth"}),[msgs]);
+
+  const send=()=>{
+    if(!input.trim())return;
+    const t=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    setMsgs(m=>[...m,{from:"buyer",text:input,time:t}]);setInput("");
+    setTimeout(()=>setMsgs(m=>[...m,{from:"seller",text:"Thanks! Let's meet at the safe zone 😊",time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}]),1100);
+  };
+  const sendOffer=()=>{
+    if(!offerVal)return;setOfferOpen(false);
+    const t=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    setMsgs(m=>[...m,{from:"buyer",text:"💰 Offer: ₦"+Number(offerVal).toLocaleString(),time:t}]);
+    toast("Offer Sent! 💸");
+    setTimeout(()=>setMsgs(m=>[...m,{from:"seller",text:"Offer received! Let me think 🤔",time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}]),1400);
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",background:BG,position:"relative"}}>
+      <div style={{background:G,padding:"40px 20px 16px",display:"flex",alignItems:"center",gap:10}}>
+        <Back onBack={()=>go("product",p)}/>
+        <div style={{width:36,height:36,background:"#fff",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:G,fontWeight:900,fontSize:11,flexShrink:0}}>
+          {p?.seller.split(" ").map(w=>w[0]).join("").slice(0,2)}
+        </div>
+        <div style={{flex:1}}>
+          <p style={{color:"#fff",fontWeight:700,fontSize:14,margin:0}}>{p?.seller}</p>
+          <p style={{color:"#86efac",fontSize:10,margin:0}}>● Online now</p>
+        </div>
+        <button onClick={()=>go("payment",p)} style={{background:"#fff",color:G,border:"none",borderRadius:999,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Pay</button>
+      </div>
+      <div style={{background:"#fffbeb",borderBottom:"1px solid #fde68a",padding:"8px 16px",display:"flex",alignItems:"center",gap:8}}>
+        <span>📦</span><p style={{color:"#92400e",fontSize:11,fontWeight:700,margin:0}}>{p?.title} · ₦{p?.price?.toLocaleString()}</p>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"16px",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{textAlign:"center"}}><span style={{fontSize:11,color:"#9ca3af",background:"#f3f4f6",borderRadius:999,padding:"3px 12px"}}>Today</span></div>
+        {msgs.map((m,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:m.from==="buyer"?"flex-end":"flex-start"}}>
+            <div style={{maxWidth:"75%",padding:"10px 14px",borderRadius:m.from==="buyer"?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.from==="buyer"?G:"#fff",color:m.from==="buyer"?"#fff":"#1f2937",fontSize:13,lineHeight:1.5,boxShadow:"0 1px 4px rgba(0,0,0,.08)"}}>
+              <p style={{margin:0}}>{m.text}</p>
+              <p style={{margin:"3px 0 0",fontSize:10,color:m.from==="buyer"?"#86efac":"#9ca3af",textAlign:"right"}}>{m.time}</p>
+            </div>
+          </div>
+        ))}
+        <div ref={bottom}/>
+      </div>
+      <div style={{background:"#fff",borderTop:"1px solid #f3f4f6",padding:"12px 16px",display:"flex",alignItems:"center",gap:8}}>
+        <button onClick={()=>setOfferOpen(true)} style={{flexShrink:0,background:BG,color:G,border:"1px solid #bbf7d0",borderRadius:12,padding:"8px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>💰 Offer</button>
+        <input style={{flex:1,background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:14,padding:"10px 14px",fontSize:13}} placeholder="Type a message..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}/>
+        <button onClick={send} style={{width:40,height:40,background:G,border:"none",borderRadius:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <svg width="18" height="18" fill="white" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+      {offerOpen&&(
+        <div onClick={()=>setOfferOpen(false)} style={{position:"absolute",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"flex-end",zIndex:40}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:"100%",background:"#fff",borderRadius:"24px 24px 0 0",padding:"24px 24px 32px",boxSizing:"border-box"}}>
+            <div style={{width:48,height:4,background:"#e5e7eb",borderRadius:2,margin:"0 auto 20px"}}/>
+            <h3 style={{fontWeight:900,fontSize:18,margin:"0 0 4px"}}>Make an Offer</h3>
+            <p style={{color:"#6b7280",fontSize:13,margin:"0 0 16px"}}>Listed at ₦{p?.price?.toLocaleString()}</p>
+            <div style={{position:"relative",marginBottom:16}}>
+              <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",color:"#9ca3af",fontWeight:700}}>₦</span>
+              <input type="number" style={{width:"100%",border:"2px solid #e5e7eb",borderRadius:14,paddingLeft:32,paddingRight:16,paddingTop:14,paddingBottom:14,fontSize:18,fontWeight:700,boxSizing:"border-box"}} placeholder="Your offer" value={offerVal} onChange={e=>setOfferVal(e.target.value)}/>
+            </div>
+            <button onClick={sendOffer} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"16px 0",fontWeight:800,fontSize:14,cursor:"pointer"}}>Send Offer 💸</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Payment ───────────────────────────────────────────────────────────────
+function CardForm({p,onOk}){
+  const [num,setNum]=useState("");const [exp,setExp]=useState("");const [cvv,setCvv]=useState("");const [name,setName]=useState("");const [loading,setLoading]=useState(false);
+  const inp={width:"100%",border:"2px solid #e5e7eb",borderRadius:14,padding:"12px 16px",fontSize:14,boxSizing:"border-box",background:"#fff"};
+  const fmtCard=v=>v.replace(/\D/g,"").slice(0,16).replace(/(.{4})/g,"$1 ").trim();
+  const fmtExp=v=>{const d=v.replace(/\D/g,"").slice(0,4);return d.length>=3?d.slice(0,2)+"/"+d.slice(2):d;};
+  return <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{background:"linear-gradient(135deg,#1a6b3c,#145530)",borderRadius:20,padding:20,color:"#fff"}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:24}}>
+        <span style={{fontSize:12,color:"#86efac",fontWeight:600}}>UniMart Card</span>
+        <div style={{display:"flex"}}><div style={{width:24,height:24,background:"#facc15",borderRadius:"50%",opacity:.9}}/><div style={{width:24,height:24,background:"#ca8a04",borderRadius:"50%",opacity:.6,marginLeft:-8}}/></div>
+      </div>
+      <p style={{fontFamily:"monospace",fontSize:15,letterSpacing:3,margin:"0 0 14px"}}>{num||"•••• •••• •••• ••••"}</p>
+      <div style={{display:"flex",justifyContent:"space-between"}}>
+        <div><p style={{fontSize:9,color:"#86efac",margin:"0 0 2px"}}>CARD HOLDER</p><p style={{fontSize:13,fontWeight:700,margin:0}}>{name||"YOUR NAME"}</p></div>
+        <div><p style={{fontSize:9,color:"#86efac",margin:"0 0 2px"}}>EXPIRES</p><p style={{fontSize:13,fontWeight:700,margin:0}}>{exp||"MM/YY"}</p></div>
+      </div>
+    </div>
+    <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af"}}>Card Number</label><input style={{...inp,marginTop:6,fontFamily:"monospace"}} placeholder="0000 0000 0000 0000" value={num} onChange={e=>setNum(fmtCard(e.target.value))} maxLength={19}/></div>
+    <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af"}}>Name on Card</label><input style={{...inp,marginTop:6}} placeholder="Chukwuemeka Obi" value={name} onChange={e=>setName(e.target.value)}/></div>
+    <div style={{display:"flex",gap:12}}>
+      <div style={{flex:1}}><label style={{fontSize:11,fontWeight:700,color:"#9ca3af"}}>Expiry</label><input style={{...inp,marginTop:6,fontFamily:"monospace"}} placeholder="MM/YY" value={exp} onChange={e=>setExp(fmtExp(e.target.value))} maxLength={5}/></div>
+      <div style={{width:100}}><label style={{fontSize:11,fontWeight:700,color:"#9ca3af"}}>CVV</label><input type="password" style={{...inp,marginTop:6,fontFamily:"monospace"}} placeholder="•••" value={cvv} onChange={e=>setCvv(e.target.value.slice(0,3))} maxLength={3}/></div>
+    </div>
+    <p style={{fontSize:11,color:"#9ca3af",margin:0}}>🔒 Secured by Paystack · 256-bit SSL</p>
+    <button onClick={()=>{setLoading(true);setTimeout(onOk,2200);}} disabled={loading} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:800,fontSize:14,cursor:loading?"not-allowed":"pointer",opacity:loading?.7:1}}>
+      {loading?"Processing...":"Pay ₦"+p?.price?.toLocaleString()+" to Escrow"}
+    </button>
+  </div>;
+}
+function TransferForm({p,onOk}){
+  const banks=[{n:"GTBank",bg:"#f97316"},{n:"Access",bg:"#ef4444"},{n:"Zenith",bg:"#2563eb"},{n:"OPay",bg:"#22c55e"},{n:"Kuda",bg:"#7c3aed"}];
+  return <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{background:"#eff6ff",border:"2px solid #bfdbfe",borderRadius:20,padding:16}}>
+      <p style={{fontSize:11,color:"#3b82f6",fontWeight:700,margin:"0 0 2px"}}>Transfer exactly</p>
+      <p style={{fontSize:30,fontWeight:900,color:"#111",margin:"0 0 2px"}}>₦{p?.price?.toLocaleString()}</p>
+      <p style={{fontSize:11,color:"#6b7280",margin:"0 0 14px"}}>to this virtual account</p>
+      <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #bfdbfe"}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:11,color:"#6b7280"}}>Account Number</span><button style={{fontSize:11,color:"#3b82f6",fontWeight:700,background:"none",border:"none",cursor:"pointer"}}>Copy</button></div>
+        <p style={{fontFamily:"monospace",fontWeight:900,fontSize:24,color:"#111",margin:"0 0 4px"}}>0123456789</p>
+        <p style={{fontSize:13,color:"#6b7280",margin:0}}>UniMart Escrow — Wema Bank</p>
+      </div>
+      <p style={{fontSize:12,color:"#ea580c",fontWeight:700,margin:"10px 0 0"}}>⏰ Account expires in 30 minutes</p>
+    </div>
+    <p style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1,margin:0}}>Open your banking app</p>
+    <div style={{display:"flex",justifyContent:"space-between"}}>
+      {banks.map(b=><button key={b.n} onClick={onOk} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer"}}>
+        <div style={{width:50,height:50,background:b.bg,borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏦</div>
+        <span style={{fontSize:10,color:"#6b7280",fontWeight:600}}>{b.n}</span>
+      </button>)}
+    </div>
+    <button onClick={onOk} style={{width:"100%",border:"2px solid "+G,background:"#fff",color:G,borderRadius:20,padding:"14px 0",fontWeight:700,fontSize:13,cursor:"pointer"}}>I've Completed the Transfer ✓</button>
+  </div>;
+}
+function USSDForm({p,onOk}){
+  const [bank,setBank]=useState("GTBank (*737#)");
+  return <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af"}}>Select Your Bank</label>
+      <select style={{width:"100%",marginTop:6,border:"2px solid #e5e7eb",borderRadius:14,padding:"12px 16px",fontSize:13,background:"#fff",boxSizing:"border-box"}} value={bank} onChange={e=>setBank(e.target.value)}>
+        {["GTBank (*737#)","Access (*901#)","Zenith (*966#)","UBA (*919#)","First Bank (*894#)"].map(b=><option key={b}>{b}</option>)}
+      </select>
+    </div>
+    <div style={{background:"#111827",borderRadius:20,padding:20,textAlign:"center"}}>
+      <p style={{color:"#6b7280",fontSize:12,margin:"0 0 8px"}}>Dial this code on your phone</p>
+      <p style={{color:"#4ade80",fontFamily:"monospace",fontSize:22,fontWeight:900,margin:"0 0 8px"}}>*737*2550*12345#</p>
+      <p style={{color:"#4b5563",fontSize:12,margin:0}}>Amount: ₦{p?.price?.toLocaleString()}</p>
+    </div>
+    <div style={{background:"#f9fafb",borderRadius:18,padding:16}}>
+      {["Dial the code above","Enter your bank PIN when prompted","Confirm ₦"+p?.price?.toLocaleString()+" payment","Come back and tap confirm below"].map((s,i)=>(
+        <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:i<3?12:0}}>
+          <div style={{width:22,height:22,background:G,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</div>
+          <p style={{fontSize:13,color:"#374151",margin:0,lineHeight:1.4}}>{s}</p>
+        </div>
+      ))}
+    </div>
+    <button onClick={onOk} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:800,fontSize:14,cursor:"pointer"}}>I've Completed the Payment ✓</button>
+  </div>;
+}
+function QRForm({p,onOk}){
+  return <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+    <p style={{fontSize:13,color:"#6b7280",margin:0}}>Scan with any Nigerian banking app</p>
+    <QR size={160}/>
+    <div style={{display:"flex",alignItems:"center",gap:8,fontSize:14}}><span style={{color:"#6b7280"}}>Expires in:</span><Countdown seconds={900}/></div>
+    <div style={{width:"100%",background:"#f9fafb",borderRadius:18,padding:16,textAlign:"center"}}>
+      <p style={{fontSize:13,fontWeight:700,color:"#374151",margin:"0 0 4px"}}>Amount to Pay</p>
+      <p style={{fontSize:30,fontWeight:900,color:G,margin:"0 0 4px"}}>₦{p?.price?.toLocaleString()}</p>
+      <p style={{fontSize:11,color:"#9ca3af",margin:0}}>UniMart Escrow Account</p>
+    </div>
+    <button onClick={onOk} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:800,fontSize:14,cursor:"pointer"}}>I've Scanned & Paid ✓</button>
+  </div>;
+}
+function WalletForm({p,onOk}){
+  const [pin,setPin]=useState(["","","",""]);
+  const bal=15400,rem=bal-(p?.price||0);
+  const handlePin=(i,v)=>{const pp=[...pin];pp[i]=v.slice(-1);setPin(pp);if(v&&i<3)document.getElementById("pp"+(i+1))?.focus();if(pp.every(d=>d!==""))setTimeout(onOk,800);};
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{background:"linear-gradient(135deg,#1a6b3c,#145530)",borderRadius:20,padding:20,color:"#fff"}}>
+      <p style={{fontSize:12,color:"#86efac",fontWeight:600,margin:"0 0 4px"}}>UniMart Wallet Balance</p>
+      <p style={{fontSize:36,fontWeight:900,margin:"0 0 14px"}}>₦{bal.toLocaleString()}</p>
+      <div style={{paddingTop:14,borderTop:"1px solid rgba(255,255,255,.2)",display:"flex",justifyContent:"space-between"}}>
+        <div><p style={{fontSize:10,color:"#86efac",margin:"0 0 2px"}}>Paying</p><p style={{fontWeight:700,fontSize:14,margin:0}}>₦{p?.price?.toLocaleString()}</p></div>
+        <div><p style={{fontSize:10,color:"#86efac",margin:"0 0 2px"}}>Remaining</p><p style={{fontWeight:700,fontSize:14,margin:0,color:rem<0?"#fca5a5":"#fff"}}>₦{rem.toLocaleString()}</p></div>
+      </div>
+    </div>
+    {rem<0&&<div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:12,padding:"10px 14px",color:"#dc2626",fontSize:12,fontWeight:700}}>⚠️ Insufficient balance. Top up ₦{Math.abs(rem).toLocaleString()} to continue.</div>}
+    <div>
+      <p style={{fontSize:14,fontWeight:700,color:"#374151",textAlign:"center",margin:"0 0 14px"}}>Enter 4-digit PIN</p>
+      <div style={{display:"flex",justifyContent:"center",gap:14}}>
+        {pin.map((d,i)=><input key={i} id={"pp"+i} type="password" inputMode="numeric" maxLength={1} value={d} onChange={e=>handlePin(i,e.target.value)} style={{width:56,height:56,border:"2px solid #e5e7eb",borderRadius:16,textAlign:"center",fontSize:24,fontWeight:900,background:"#f9fafb"}}/>)}
+      </div>
+    </div>
+  </div>;
+}
+function CryptoForm({p,onOk}){
+  const rate=1650,usdt=((p?.price||0)/rate).toFixed(2);
+  const addr="TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE";
+  return <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:14,padding:"10px 14px",fontSize:12,color:"#92400e",fontWeight:700}}>⚠️ Only send USDT on TRC-20 network. Other networks = permanent loss.</div>
+    <div style={{background:"#f9fafb",borderRadius:18,padding:16,display:"flex",flexDirection:"column",gap:10}}>
+      {[["Amount (Naira)","₦"+p?.price?.toLocaleString()],["Exchange Rate","₦"+rate.toLocaleString()+" / USDT"]].map(([k,v])=>(
+        <div key={k} style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:13,color:"#6b7280"}}>{k}</span><span style={{fontSize:13,fontWeight:700}}>{v}</span></div>
+      ))}
+      <div style={{paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between"}}>
+        <span style={{fontSize:14,fontWeight:700}}>Send USDT</span>
+        <span style={{fontSize:22,fontWeight:900,color:G}}>{usdt} USDT</span>
+      </div>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+      <QR size={130}/>
+      <div style={{width:"100%",background:"#111827",borderRadius:14,padding:14}}>
+        <p style={{fontSize:10,color:"#6b7280",margin:"0 0 4px"}}>TRC-20 Wallet Address</p>
+        <p style={{fontFamily:"monospace",color:"#4ade80",fontSize:11,wordBreak:"break-all",margin:"0 0 8px"}}>{addr}</p>
+        <button style={{background:"#374151",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Copy Address</button>
+      </div>
+    </div>
+    <button onClick={onOk} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:800,fontSize:14,cursor:"pointer"}}>I've Sent the Payment ✓</button>
+  </div>;
+}
+
+function PaySuccess({p,ref_}){
+  return <div className="fade-in" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"24px",gap:20,textAlign:"center"}}>
+    <div className="pulse-ring" style={{width:96,height:96,background:BG,border:"4px solid "+G,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:44}}>✅</span></div>
+    <div><h3 style={{fontSize:22,fontWeight:900,color:"#111",margin:"0 0 8px"}}>Payment Held in Escrow</h3><p style={{fontSize:13,color:"#6b7280",lineHeight:1.5}}>Your money is safe. Funds release when seller shows QR at pickup.</p></div>
+    <div style={{width:"100%",background:BG,border:"2px solid #bbf7d0",borderRadius:20,padding:16,display:"flex",flexDirection:"column",gap:10}}>
+      {[["Item",p?.title],["Amount","₦"+p?.price?.toLocaleString()],["Escrow Ref",ref_],["Status","🔒 In Escrow"]].map(([k,v])=>(
+        <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,color:"#6b7280"}}>{k}</span><span style={{fontSize:13,fontWeight:700,color:k==="Amount"?G:"#111"}}>{v}</span></div>
+      ))}
+    </div>
+    <div style={{width:"100%",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:20,padding:16}}>
+      <p style={{fontSize:13,fontWeight:800,color:"#1e40af",margin:"0 0 10px"}}>🤝 Pickup QR Code</p>
+      <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><QR size={100}/></div>
+      <p style={{fontSize:12,fontWeight:700,color:"#1d4ed8",margin:"0 0 4px"}}>Scan at meetup</p>
+      <p style={{fontSize:11,color:"#3b82f6",margin:0}}>Show to seller at Main Gate safe zone</p>
+    </div>
+    <div style={{width:"100%",background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:14,padding:"10px 14px",fontSize:12,color:"#9a3412",fontWeight:700}}>⏰ Auto-refund in 48 hours if pickup doesn't happen</div>
+    <EscrowBadge/>
+  </div>;
+}
+
+function Payment({p,go,toast}){
+  const [method,setMethod]=useState(null);
+  const [step,setStep]=useState("select");
+  const [ref_]=useState("UME-"+Math.random().toString(36).slice(2,8).toUpperCase());
+  const ok=()=>{setStep("processing");setTimeout(()=>{setStep("success");toast("Payment Held in Escrow ✓");},2000);};
+
+  if(step==="processing") return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",background:BG,gap:20}}>
+      <div style={{position:"relative",width:80,height:80}}>
+        <div style={{position:"absolute",inset:0,border:"4px solid #e5e7eb",borderRadius:"50%"}}/>
+        <div className="spin" style={{position:"absolute",inset:0,border:"4px solid transparent",borderTopColor:G,borderRadius:"50%"}}/>
+      </div>
+      <h3 style={{fontSize:20,fontWeight:900,margin:0}}>Processing Payment</h3>
+      <p style={{fontSize:14,color:"#6b7280",margin:0}}>Securing funds in escrow...</p>
+    </div>
+  );
+  if(step==="success") return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 16px"}}><h2 style={{color:"#fff",fontWeight:700,fontSize:16,margin:0}}>Escrow Payment</h2></div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <PaySuccess p={p} ref_={ref_}/>
+        <div style={{padding:"0 24px 32px"}}><button onClick={()=>go("home")} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"15px 0",fontWeight:800,fontSize:14,cursor:"pointer"}}>Back to Home 🏠</button></div>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 16px",display:"flex",alignItems:"center",gap:10}}>
+        <Back onBack={step==="form"?()=>setStep("select"):()=>go("product",p)}/>
+        <h2 style={{color:"#fff",fontWeight:700,fontSize:16,margin:0,flex:1}}>Escrow Payment</h2>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"16px",display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{background:"#fff",borderRadius:20,padding:16,border:"1px solid #f3f4f6"}}>
+          <p style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1,margin:"0 0 12px"}}>Order Summary</p>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{width:52,height:52,background:BG,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>{p?.emoji}</div>
+            <div><p style={{fontWeight:700,color:"#1f2937",fontSize:14,margin:"0 0 2px"}}>{p?.title}</p><p style={{color:G,fontWeight:900,fontSize:18,margin:0}}>₦{p?.price?.toLocaleString()}</p></div>
+          </div>
+          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #f3f4f6",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <EscrowBadge/><span style={{fontSize:11,color:"#9ca3af"}}>+ ₦0 fee</span>
+          </div>
+        </div>
+        {step==="select"&&<>
+          <p style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1,margin:"0 0 4px"}}>Choose Payment Method</p>
+          {PAY_METHODS.map(m=>(
+            <button key={m.id} onClick={()=>{setMethod(m.id);setStep("form");}} style={{width:"100%",background:"#fff",border:"2px solid #f3f4f6",borderRadius:20,padding:14,display:"flex",alignItems:"center",gap:14,cursor:"pointer",textAlign:"left",boxSizing:"border-box"}}>
+              <span style={{fontSize:26,width:36,textAlign:"center"}}>{m.icon}</span>
+              <div style={{flex:1}}><p style={{fontWeight:700,color:"#1f2937",fontSize:14,margin:"0 0 2px"}}>{m.label}</p><p style={{color:"#9ca3af",fontSize:11,margin:0}}>{m.desc}</p></div>
+              <span style={{color:"#d1d5db",fontSize:18}}>›</span>
+            </button>
+          ))}
+        </>}
+        {step==="form"&&(
+          <div className="slide-up" style={{background:"#fff",borderRadius:20,padding:20,border:"1px solid #f3f4f6"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+              <span style={{fontSize:22}}>{PAY_METHODS.find(m=>m.id===method)?.icon}</span>
+              <p style={{fontWeight:700,color:"#1f2937",fontSize:15,margin:0}}>{PAY_METHODS.find(m=>m.id===method)?.label}</p>
+            </div>
+            {method==="card"&&<CardForm p={p} onOk={ok}/>}
+            {method==="transfer"&&<TransferForm p={p} onOk={ok}/>}
+            {method==="ussd"&&<USSDForm p={p} onOk={ok}/>}
+            {method==="qr"&&<QRForm p={p} onOk={ok}/>}
+            {method==="wallet"&&<WalletForm p={p} onOk={ok}/>}
+            {method==="crypto"&&<CryptoForm p={p} onOk={ok}/>}
+          </div>
+        )}
+        <div style={{height:16}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── Sell ──────────────────────────────────────────────────────────────────
+function Sell({go,toast}){
+  const [form,setForm]=useState({name:"",category:"Textbooks",price:"",description:""});
+  const [photo,setPhoto]=useState(false);const [loading,setLoading]=useState(false);
+  const inp={width:"100%",border:"2px solid #e5e7eb",borderRadius:14,padding:"12px 16px",fontSize:14,boxSizing:"border-box",background:"#fff"};
+  return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 20px"}}>
+        <h2 style={{color:"#fff",fontWeight:900,fontSize:22,margin:"0 0 4px"}}>Create Listing</h2>
+        <p style={{color:"#86efac",fontSize:12,margin:0}}>Sell to students near you</p>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"20px",display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#dcfce7",border:"1px solid #86efac",borderRadius:999,padding:"6px 14px"}}>
+          📍 <span style={{fontSize:12,fontWeight:700,color:"#15803d"}}>You're in Ugbowo Zone ✓</span>
+        </div>
+        <button onClick={()=>setPhoto(true)} style={{width:"100%",height:130,borderRadius:20,border:"2px dashed "+(photo?"#22c55e":"#d1d5db"),background:photo?"#f0fdf4":"#fff",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer"}}>
+          <span style={{fontSize:36,color:photo?undefined:"#d1d5db"}}>{photo?"📸":"📷"}</span>
+          <p style={{fontSize:14,fontWeight:600,color:photo?"#16a34a":"#9ca3af",margin:0}}>{photo?"Photo Added ✓":"Tap to Upload Photo"}</p>
+        </button>
+        <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Item Name *</label><input style={{...inp,marginTop:8}} placeholder="e.g. CHM 101 Textbook" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></div>
+        <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Category *</label>
+          <select style={{...inp,marginTop:8}} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
+            {CATEGORIES.filter(c=>c!=="All").map(c=><option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Price (₦) *</label>
+          <div style={{position:"relative",marginTop:8}}>
+            <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",color:"#9ca3af",fontWeight:700}}>₦</span>
+            <input type="number" style={{...inp,paddingLeft:32}} placeholder="0" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))}/>
+          </div>
+        </div>
+        <div><label style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1}}>Description</label><textarea rows={4} style={{...inp,marginTop:8,resize:"none"}} placeholder="Describe condition, why selling..." value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}/></div>
+        <button onClick={()=>{if(!form.name||!form.price){toast("Fill name and price first");return;}setLoading(true);setTimeout(()=>{toast("Listing Live! 🎉");setLoading(false);go("home");},1500);}} disabled={loading} style={{width:"100%",background:G,color:"#fff",border:"none",borderRadius:20,padding:"16px 0",fontWeight:900,fontSize:16,cursor:loading?"not-allowed":"pointer",opacity:loading?.7:1,boxShadow:"0 4px 20px rgba(26,107,60,.3)"}}>
+          {loading?"Posting...":"Post Listing 🚀"}
+        </button>
+        <div style={{height:16}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────
+function Profile({go,toast}){
+  const [notif,setNotif]=useState(true);
+  const listings=[{id:1,emoji:"📚",title:"MTH 201 Textbook",price:2000},{id:2,emoji:"🖥️",title:"Laptop Stand",price:4500}];
+  return(
+    <div className="fade-in" style={{display:"flex",flexDirection:"column",height:"100%",background:BG}}>
+      <div style={{background:G,padding:"40px 20px 24px",textAlign:"center"}}>
+        <div style={{width:80,height:80,background:"#fff",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",boxShadow:"0 4px 20px rgba(0,0,0,.15)",color:G,fontWeight:900,fontSize:24}}>CO</div>
+        <h2 style={{color:"#fff",fontSize:20,fontWeight:900,margin:"0 0 4px"}}>Chukwuemeka Obi</h2>
+        <p style={{color:"#86efac",fontSize:12,margin:"0 0 8px"}}>chukwuemeka@uniben.edu.ng</p>
+        <VBadge/>
+        <div style={{marginTop:8,display:"flex",justifyContent:"center"}}><Stars r={4.7}/></div>
+      </div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",background:"#fff",borderBottom:"1px solid #f3f4f6"}}>
+          {[["12","Items Sold"],["3","Active"],["2023","Since"]].map(([v,l],i)=>(
+            <div key={l} style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 0",borderRight:i<2?"1px solid #f3f4f6":"none"}}>
+              <p style={{color:G,fontWeight:900,fontSize:22,margin:"0 0 2px"}}>{v}</p>
+              <p style={{color:"#9ca3af",fontSize:11,margin:0}}>{l}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:16}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <p style={{fontWeight:900,color:"#111",fontSize:16,margin:0}}>My Listings</p>
+              <button onClick={()=>go("sell")} style={{background:BG,border:"1px solid #bbf7d0",color:G,borderRadius:999,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New</button>
+            </div>
+            {listings.map(item=>(
+              <div key={item.id} style={{background:"#fff",borderRadius:20,padding:12,border:"1px solid #f3f4f6",boxShadow:"0 1px 4px rgba(0,0,0,.06)",display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                <div style={{width:52,height:52,background:BG,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>{item.emoji}</div>
+                <div style={{flex:1}}>
+                  <p style={{fontWeight:700,color:"#1f2937",fontSize:14,margin:"0 0 2px"}}>{item.title}</p>
+                  <p style={{color:G,fontWeight:900,fontSize:14,margin:"0 0 4px"}}>₦{item.price.toLocaleString()}</p>
+                  <span style={{background:"#f0fdf4",color:"#16a34a",fontSize:11,fontWeight:700,borderRadius:999,padding:"2px 10px"}}>● Active</span>
+                </div>
+                <button style={{background:"none",border:"none",color:"#d1d5db",fontSize:20,cursor:"pointer"}}>⋮</button>
+              </div>
+            ))}
+          </div>
+          <div style={{background:"#fff",borderRadius:20,overflow:"hidden",border:"1px solid #f3f4f6"}}>
+            <p style={{fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:1,padding:"12px 16px",borderBottom:"1px solid #f3f4f6",margin:0}}>Settings</p>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid #f3f4f6"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:18}}>🔔</span><span style={{fontSize:14,fontWeight:600,color:"#374151"}}>Push Notifications</span></div>
+              <button onClick={()=>setNotif(n=>!n)} style={{width:48,height:26,borderRadius:999,border:"none",background:notif?G:"#d1d5db",cursor:"pointer",position:"relative",transition:"background .2s"}}>
+                <div style={{position:"absolute",top:3,width:20,height:20,background:"#fff",borderRadius:"50%",boxShadow:"0 1px 3px rgba(0,0,0,.2)",transition:"transform .2s",transform:"translateX("+(notif?25:3)+"px)"}}/>
+              </button>
+            </div>
+            {[["🛡️","Privacy & Safety"],["💬","Chat Settings"],["🏦","Payment Methods"],["❓","Help & Support"]].map(([icon,label])=>(
+              <button key={label} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",background:"none",border:"none",borderBottom:"1px solid #f3f4f6",cursor:"pointer",textAlign:"left"}}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:18}}>{icon}</span><span style={{fontSize:14,fontWeight:600,color:"#374151"}}>{label}</span></div>
+                <span style={{color:"#d1d5db",fontSize:18}}>›</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={()=>{toast("Logged out");setTimeout(()=>go("splash"),500);}} style={{width:"100%",background:"#fef2f2",border:"2px solid #fecaca",color:"#dc2626",borderRadius:20,padding:"14px 0",fontWeight:700,fontSize:14,cursor:"pointer"}}>🚪 Log Out</button>
+          <div style={{height:16}}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bottom Nav ────────────────────────────────────────────────────────────
+function BottomNav({screen,go}){
+  if(["splash","login"].includes(screen))return null;
+  const tabs=[["home","🏠","Home"],["sell","➕","Sell"],["chat","💬","Chat"],["profile","👤","Profile"]];
+  return(
+    <div style={{background:"#fff",borderTop:"1px solid #f3f4f6",display:"flex"}}>
+      {tabs.map(([id,icon,label])=>(
+        <button key={id} onClick={()=>go(id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 0 8px",gap:2,border:"none",background:"none",cursor:"pointer",color:screen===id?G:"#9ca3af"}}>
+          <span style={{fontSize:20}}>{icon}</span>
+          <span style={{fontSize:10,fontWeight:700}}>{label}</span>
+          {screen===id&&<div style={{width:4,height:4,background:G,borderRadius:"50%"}}/>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Root ──────────────────────────────────────────────────────────────────
+function App(){
+  const [screen,setScreen]=useState("splash");
+  const [product,setProduct]=useState(null);
+  const [toast,setToast]=useState(null);
+  const tk=useRef(0);
+  const showToast=msg=>{tk.current++;setToast({msg,key:tk.current});};
+  const go=(s,p=null)=>{if(p)setProduct(p);setScreen(s);};
+
+  const render=()=>{
+    switch(screen){
+      case "splash":   return <Splash go={go}/>;
+      case "login":    return <Login go={go} toast={showToast}/>;
+      case "home":     return <Home go={go} toast={showToast}/>;
+      case "product":  return <Product p={product} go={go} toast={showToast}/>;
+      case "chat":     return <Chat p={product} go={go} toast={showToast}/>;
+      case "payment":  return <Payment p={product} go={go} toast={showToast}/>;
+      case "sell":     return <Sell go={go} toast={showToast}/>;
+      case "profile":  return <Profile go={go} toast={showToast}/>;
+      default:         return <Home go={go} toast={showToast}/>;
+    }
+  };
+
+  return(
+    <div style={{display:"flex",justifyContent:"center",alignItems:"flex-start",minHeight:"100vh",background:"linear-gradient(135deg,#d1fae5,#e5e7eb)"}}>
+      {toast&&<Toast key={toast.key} message={toast.msg} onClose={()=>setToast(null)}/>}
+      <div style={{width:"100%",maxWidth:420,minHeight:"100vh",background:"#fff",display:"flex",flexDirection:"column",boxShadow:"0 30px 80px rgba(0,0,0,.25)",position:"relative",overflow:"hidden"}}>
+        <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>{render()}</div>
+        <BottomNav screen={screen} go={go}/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
