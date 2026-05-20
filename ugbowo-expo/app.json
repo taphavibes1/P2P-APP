@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "UniMart",
+    "slug": "unimart",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#1a6b3c",
+    "splash": {
+      "backgroundColor": "#1a6b3c"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.unimart.app"
+    },
+    "android": {
+      "package": "com.unimart.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1a6b3c"
+      }
+    },
+    "platforms": ["ios", "android"]
+  }
+}
